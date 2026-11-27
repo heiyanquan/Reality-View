@@ -1,0 +1,25 @@
+# Wrangler 本地缓存（含账户信息，切勿上传）
+.wrangler/
+
+# 本地启动脚本（非站点运行所需）
+start.cmd
+run-codex.ps1
+
+# 版本控制相关
+.git/
+.gitignore
+.gitattributes
+
+# MemSearch 本地状态
+.memsearch/
+
+# 本地备份目录
+._backup-*/
+
+# 部署配置本身
+wrangler.jsonc
+
+# 文档与截图（非站点运行所需资源）
+README.md
+1.png
+1.webp
