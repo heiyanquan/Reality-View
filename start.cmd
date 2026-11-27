@@ -1,30 +1,25 @@
 @echo off
 chcp 65001 >nul
-setlocal
 cd /d "%~dp0"
 
-set "PORT=8123"
-set "URL=http://127.0.0.1:%PORT%/index.html"
+where pnpm >nul 2>nul
+if errorlevel 1 (
+  echo 未找到 pnpm。请先安装 Node.js 和 pnpm:
+  echo   npm install -g pnpm
+  pause
+  exit /b 1
+)
 
-where python >nul 2>nul
-if not errorlevel 1 goto :python
+if not exist node_modules (
+  echo 首次运行，正在安装依赖...
+  call pnpm install
+  if errorlevel 1 (
+    echo 依赖安装失败
+    pause
+    exit /b 1
+  )
+)
 
-where npx >nul 2>nul
-if not errorlevel 1 goto :node
-
-echo 未找到 python 或 npx。请任选其一安装，或用任意静态服务器把本目录跑起来。
-echo 页面必须通过 http:// 打开，直接双击 html 会被浏览器的 CORS 策略拦住。
-pause
-exit /b 1
-
-:python
-echo 正在 http://127.0.0.1:%PORT% 提供本目录，按 Ctrl+C 停止。
-start "" "%URL%"
-python -m http.server %PORT% --bind 127.0.0.1
-exit /b 0
-
-:node
-echo 正在 http://127.0.0.1:%PORT% 提供本目录，按 Ctrl+C 停止。
-start "" "%URL%"
-npx --yes serve -l %PORT% .
-exit /b 0
+echo 启动 Vite 开发服务器: http://127.0.0.1:8123/
+echo 按 Ctrl+C 停止。
+call pnpm run dev -- --port 8123 --open

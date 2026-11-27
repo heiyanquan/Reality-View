@@ -1,9 +1,8 @@
 {
-  // Cloudflare Workers 配置：纯静态站点
+  // Cloudflare Workers 配置：纯静态站点（部署前先 npm run build）
   "name": "reality-view",
   "compatibility_date": "2026-11-27",
   "assets": {
-    // 静态资源就是项目根目录，具体排除项见 .assetsignore
-    "directory": "./"
+    "directory": "./dist"
   }
 }

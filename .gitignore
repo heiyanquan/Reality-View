@@ -1,8 +1,17 @@
+# 依赖
+node_modules/
+
+# 构建产物（Cloudflare 部署源目录，勿提交）
+dist/
+
+# Wrangler 本地缓存（含账户信息，切勿上传）
+.wrangler/
+
 # MemSearch 本地状态
 .memsearch/
 
-# Wrangler 本地缓存
-.wrangler/
+# Playwright CLI 本地产物
+.playwright-cli/
 
 # 本地备份目录
 ._backup-*/

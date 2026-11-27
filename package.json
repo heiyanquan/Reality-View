@@ -1,0 +1,34 @@
+{
+  "name": "reality-view",
+  "version": "0.1.0",
+  "description": "一个单页 Three.js 3D 演示：模拟 Tesla FSD v15 \"Reality View\" 风格驾驶画面，自车 + 程序化车辆 + 循环世界（道路、车道、海面、棕榈树、帆船），自车位置固定在世界原点附近，世界整体后退以产生前进感。",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/heiyanquan/Reality-View.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/heiyanquan/Reality-View/issues"
+  },
+  "homepage": "https://github.com/heiyanquan/Reality-View#readme",
+  "dependencies": {
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "three": "^0.166.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.3.0",
+    "vite": "^8.4.0"
+  },
+  "packageManager": "pnpm@12.4.2"
+}
