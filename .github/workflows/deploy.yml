@@ -11,13 +11,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - uses: pnpm/action-setup@v4 # 版本从 package.json 的 packageManager 字段读取
+
       - uses: actions/setup-node@v5
         with:
           node-version: 24
-
-      - name: Install pnpm
-        # 版本与 package.json 的 packageManager 字段保持一致
-        run: npm install -g pnpm@12.4.2
+          cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
