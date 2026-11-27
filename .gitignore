@@ -1,6 +1,9 @@
 # MemSearch 本地状态
 .memsearch/
 
+# Wrangler 本地缓存
+.wrangler/
+
 # 本地备份目录
 ._backup-*/
 
