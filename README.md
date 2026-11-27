@@ -20,7 +20,7 @@
   ```
   python -m http.server 8123 --bind 127.0.0.1
   ```
-  然后访问 http://127.0.0.1:8123/reality-view.html
+  然后访问 http://127.0.0.1:8123/index.html
 
 ## 依赖
 

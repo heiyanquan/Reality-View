@@ -963,7 +963,7 @@
     }
 
     if (location.protocol === 'file:') {
-      document.querySelector('#info').textContent = '请通过本地服务器打开：双击 start.cmd，然后访问 http://127.0.0.1:8123/reality-view.html';
+      document.querySelector('#info').textContent = '请通过本地服务器打开：双击 start.cmd，然后访问 http://127.0.0.1:8123/index.html';
     } else {
       start().catch(err => {
         document.querySelector('#info').textContent = '3D 场景启动失败，请查看控制台。';

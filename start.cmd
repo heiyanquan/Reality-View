@@ -4,7 +4,7 @@ setlocal
 cd /d "%~dp0"
 
 set "PORT=8123"
-set "URL=http://127.0.0.1:%PORT%/reality-view.html"
+set "URL=http://127.0.0.1:%PORT%/index.html"
 
 where python >nul 2>nul
 if not errorlevel 1 goto :python
