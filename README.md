@@ -52,6 +52,12 @@ pnpm exec wrangler deploy
 
 线上地址：https://reality-view.heiyanquan.workers.dev
 
+### GitHub Actions 自动部署
+
+push 到 `main` 会自动触发 `.github/workflows/deploy.yml`：云端安装依赖 → `pnpm run build` → `wrangler deploy`。也可在仓库 Actions 页面手动 **Run workflow**。
+
+前置条件（已配置）：仓库 Secret `CLOUDFLARE_API_TOKEN`（Workers 编辑权限的 API Token）。
+
 ## 常见问题
 
 **`pnpm install` 报 `ERR_PNPM_IGNORED_BUILDS`（esbuild/workerd）**
