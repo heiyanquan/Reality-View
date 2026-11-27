@@ -47,14 +47,42 @@ Cloudflare Workers 静态部署（`wrangler.jsonc` 已指向 `dist/`）：
 
 ```
 pnpm run build
-npx wrangler deploy
+pnpm exec wrangler deploy
 ```
+
+线上地址：https://reality-view.heiyanquan.workers.dev
+
+## 常见问题
+
+**`pnpm install` 报 `ERR_PNPM_IGNORED_BUILDS`（esbuild/workerd）**
+
+pnpm 12 默认禁止依赖的 postinstall 脚本。已在 `pnpm-workspace.yaml` 中通过 `allowBuilds` 放行 `esbuild` 和 `workerd`（wrangler 的本地运行时需要）。若以后新增依赖遇到同样报错，把包名加进该文件即可：
+
+```yaml
+allowBuilds:
+  esbuild: true
+  workerd: true
+  <新包名>: true
+```
+
+**不要用 `pnpm dlx wrangler`**
+
+`dlx` 在独立缓存目录执行，不读取项目的 `pnpm-workspace.yaml`，会再次触发 `ERR_PNPM_IGNORED_BUILDS`。wrangler 已作为 devDependency 安装，请用 `pnpm exec wrangler <cmd>`。
+
+**`pnpm add` 提示 `minimumReleaseAge`**
+
+pnpm 有供应链防护，默认只安装发布满一定时间的版本。`vite@8.4.0` 因发布时间较新被记录在 `pnpm-workspace.yaml` 的 `minimumReleaseAgeExclude` 中；其他包被拦时可同样按需豁免，但建议优先等几天或降级版本。
+
+**React StrictMode 下场景被创建两次**
+
+`main.jsx` 开启了 `StrictMode`，开发模式下 `useEffect` 会挂载→卸载→再挂载。`RealityView.dispose()` 已完整清理 RAF、事件监听、几何体/材质/贴图和 renderer，无需特殊处理；但新增副作用时注意必须可重复执行。
 
 ## 依赖
 
 - react 19 / react-dom 19
 - three 0.166.1（npm 包，含 `three/addons/`）
 - vite 8 + @vitejs/plugin-react
+- wrangler 4（devDependency，仅部署用）
 - 程序化生成所有几何体与贴图，**不需要外部模型文件**
 
 ## 许可证
