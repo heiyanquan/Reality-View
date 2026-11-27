@@ -15,9 +15,9 @@ jobs:
         with:
           node-version: 24
 
-      - name: Enable pnpm via corepack
-        # pnpm 版本由 package.json 的 packageManager 字段自动解析
-        run: corepack enable
+      - name: Install pnpm
+        # 版本与 package.json 的 packageManager 字段保持一致
+        run: npm install -g pnpm@12.4.2
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
