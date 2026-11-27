@@ -3,6 +3,8 @@
   "name": "reality-view",
   "compatibility_date": "2026-11-27",
   "assets": {
-    "directory": "./dist"
+    "directory": "./dist",
+    // React Router 客户端路由：未知路径回退到 index.html
+    "not_found_handling": "single-page-application"
   }
 }

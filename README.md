@@ -17,13 +17,28 @@
 index.html            Vite 入口
 src/
   main.jsx            React 挂载点
-  App.jsx             HUD 组件 + 场景生命周期管理
-  styles.css          全部 HUD 样式
+  App.jsx             路由壳（react-router-dom）
+  components/
+    TopNav.jsx        全局顶部导航
+  pages/
+    RealityViewPage.jsx  驾驶演示页（HUD 组件 + 场景生命周期）
+    AboutPage.jsx        About 页（路由示例）
+  styles.css          全部样式
   three/
     RealityView.js    Three.js 场景类（世界构建、相机、交通、动画循环、dispose）
     textures.js       程序化 Canvas 贴图（天空/沥青/水面/混凝土）
     vehicles.js       程序化车辆生成（5 种车型）
+.devin/
+  skills/             项目级 agent skills（frontend-design、vercel-react-best-practices）
+  mcp_config.json     MCP servers（context7 文档查询）
 ```
+
+## 路由
+
+- `/` — Reality View 驾驶演示
+- `/about` — About 页
+- 未知路径重定向到 `/`；部署端 `wrangler.jsonc` 已配置 `not_found_handling: single-page-application`，支持客户端路由直达/刷新
+- 新增页面：在 `src/pages/` 建组件，在 `src/App.jsx` 的 `<Routes>` 里加 `<Route>`，需要时在 `TopNav` 加链接
 
 ## 运行
 
@@ -85,7 +100,7 @@ pnpm 有供应链防护，默认只安装发布满一定时间的版本。`vite@
 
 ## 依赖
 
-- react 19 / react-dom 19
+- react 19 / react-dom 19 / react-router-dom 7
 - three 0.166.1（npm 包，含 `three/addons/`）
 - vite 8 + @vitejs/plugin-react
 - wrangler 4（devDependency，仅部署用）
