@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reality View — FSD 风格 3D 环境重建</title>
+  <link rel="icon" href="data:,">
+  <style>
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #050a0f; font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; }
+    canvas { display: block; position: absolute; inset: 0; z-index: 0; }
+    body::after {
+      content: ''; position: fixed; inset: 0; z-index: 2; pointer-events: none;
+      background:
+        radial-gradient(ellipse at 50% 42%, rgba(0,0,0,0) 40%, rgba(0,0,0,0.5) 100%),
+        linear-gradient(to bottom, rgba(20, 35, 50, 0.28) 0%, transparent 26%);
+    }
+
+    #hud { position: absolute; inset: 0; z-index: 20; pointer-events: none; }
+
+    /* ---------- 顶栏 ---------- */
+    #topbar {
+      position: absolute; top: 18px; left: 50%; transform: translateX(-50%); z-index: 21;
+      display: flex; align-items: center; gap: 16px;
+      color: #fff; background: rgba(8, 12, 18, 0.6); border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 12px; padding: 8px 20px; backdrop-filter: blur(10px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+      min-width: 380px; justify-content: space-between;
+    }
+    .tb-left { display: flex; align-items: center; gap: 20px; }
+    .hud-item { display: flex; align-items: center; gap: 7px; font-size: 13px; letter-spacing: 0.05em; text-transform: uppercase; color: #e8eef4; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #10b981; box-shadow: 0 0 10px #10b981; }
+    .dot.warn { background: #f59e0b; box-shadow: 0 0 10px #f59e0b; }
+    .big { font-size: 40px; font-weight: 800; letter-spacing: -0.02em; line-height: 1; color: #fff; font-variant-numeric: tabular-nums; }
+    .big .unit { font-size: 15px; font-weight: 500; opacity: 0.8; margin-left: 3px; }
+    .gear { font-size: 26px; font-weight: 700; color: #fff; }
+
+    /* ---------- 左侧导航提示 ---------- */
+    #navpanel {
+      position: absolute; top: 96px; left: 26px; z-index: 21;
+      display: flex; flex-direction: column; gap: 10px; align-items: flex-start;
+    }
+    .nav-row {
+      display: flex; align-items: center; gap: 12px;
+      color: #cbd5e1; font-size: 13px;
+      background: rgba(8,12,18,0.5); border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 10px; padding: 8px 14px; backdrop-filter: blur(8px);
+      white-space: nowrap;
+    }
+    .nav-turn { font-size: 28px; color: #94a3b8; line-height: 1; }
+    .nav-turn.right { color: #22d3ee; }
+    .nav-street { font-size: 15px; font-weight: 600; color: #e2e8f0; }
+    .nav-dist { font-size: 12px; opacity: 0.6; margin-top: 2px; }
+    .speed-limit {
+      width: 42px; height: 42px; border-radius: 8px; background: #f8fafc; border: 1px solid rgba(0,0,0,0.3);
+      display: flex; align-items: center; justify-content: center; color: #111827; font-size: 20px; font-weight: 800;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+    }
+
+    /* ---------- 顶部中间状态 ---------- */
+    #midmode {
+      position: absolute; top: 24px; left: 50%; transform: translateX(-50%); z-index: 21;
+      font-size: 16px; font-weight: 500; color: #e2e8f0; letter-spacing: 0.04em;
+      white-space: nowrap;
+    }
+
+    /* ---------- 右下行程卡片 ---------- */
+    #tripcard {
+      position: absolute; bottom: 152px; right: 26px; z-index: 21;
+      width: 236px;
+      background: rgba(8,12,18,0.62); border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 14px; padding: 14px 16px; backdrop-filter: blur(10px);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+    }
+    .trip-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+    .trip-time { font-size: 16px; font-weight: 700; color: #fff; }
+    .trip-dest { font-size: 12px; color: #94a3b8; }
+    .trip-line { display: flex; justify-content: space-between; font-size: 14px; color: #cbd5e1; margin-bottom: 4px; }
+    .trip-line .val { font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; }
+    .trip-btn {
+      margin-top: 12px; width: 100%; height: 34px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(15,23,32,0.7); color: #e2e8f0; font-size: 13px; font-weight: 600; cursor: pointer;
+    }
+    .trip-btn:hover { border-color: rgba(255,255,255,0.4); }
+    .battery { height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; margin-top: 10px; }
+    .battery-fill { height: 100%; width: 68%; background: linear-gradient(90deg, #22d3ee, #10b981); border-radius: 3px; }
+    #batlabel { display: flex; justify-content: space-between; font-size: 11px; color: #94a3b8; margin-top: 5px; }
+
+    /* ---------- 底部媒体条 ---------- */
+    #mediabar {
+      position: absolute; bottom: 64px; left: 50%; transform: translateX(-50%); z-index: 21;
+      width: 540px; display: flex; align-items: center; gap: 16px;
+      background: rgba(8,12,18,0.5); border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 12px; padding: 11px 18px; backdrop-filter: blur(10px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    .media-art { width: 54px; height: 54px; border-radius: 10px; background: linear-gradient(135deg, #8a6a3a, #3f2d18); border: 1px solid rgba(255,255,255,0.14); flex-shrink: 0; }
+    .media-info { flex: 1; min-width: 0; }
+    .media-title { font-size: 14px; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .media-artist { font-size: 12px; color: #94a3b8; }
+    .media-controls { display: flex; align-items: center; gap: 9px; }
+    .media-btn { width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.22); background: rgba(15,23,32,0.55); color: #e2e8f0; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+    .media-btn.play { width: 42px; height: 42px; background: #10b981; color: #fff; border-color: #10b981; }
+    .media-btn:hover { background: rgba(255,255,255,0.12); }
+
+    /* ---------- 最底行 ---------- */
+    #bottomrow {
+      position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); z-index: 21;
+      display: flex; align-items: center; gap: 22px; color: #e2e8f0;
+    }
+    .bottom-item { display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; opacity: 0.82; }
+    .bottom-item:hover { opacity: 1; }
+    .bottom-item .icon { width: 34px; height: 34px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.14); background: rgba(15,23,32,0.5); display: flex; align-items: center; justify-content: center; font-size: 15px; }
+    .bottom-item .label { font-size: 10px; opacity: 0.75; }
+    .temp { font-size: 17px; font-weight: 700; color: #fff; }
+    .sep { width: 1px; height: 26px; background: rgba(255,255,255,0.1); }
+
+    /* ---------- 左下按钮 ---------- */
+    #toolbar {
+      position: absolute; bottom: 16px; left: 16px; z-index: 21;
+      display: flex; flex-direction: column; gap: 8px; pointer-events: auto;
+    }
+    button {
+      appearance: none; border: 1px solid rgba(255,255,255,0.22); background: rgba(8,12,18,0.6);
+      color: #e2e8f0; padding: 8px 14px; border-radius: 8px; font-size: 12.5px; cursor: pointer;
+      backdrop-filter: blur(6px); min-width: 104px; text-align: left; box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      display: flex; align-items: center; gap: 8px;
+    }
+    button:hover { border-color: rgba(255,255,255,0.45); background: rgba(16,185,129,0.15); }
+    button.active { background: rgba(16,185,129,0.2); border-color: #10b981; color: #6ee7b7; }
+    .kbd { font-size: 10px; opacity: 0.5; margin-left: auto; }
+
+    #info {
+      position: absolute; top: 16px; left: 16px; z-index: 22;
+      color: #fff; background: rgba(8,12,18,0.7); padding: 8px 14px; border-radius: 10px;
+      backdrop-filter: blur(8px); font-size: 13px; border: 1px solid rgba(255,255,255,0.1);
+    }
+    .hidden { display: none !important; }
+  </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./vendor/three.module.js",
+        "three/addons/": "./vendor/addons/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <canvas id="main"></canvas>
+
+  <div id="hud">
+    <div id="topbar">
+      <div class="tb-left">
+        <div class="hud-item"><span class="dot"></span><span>PRN</span></div>
+        <div class="hud-item"><span id="range">212</span><span style="font-size:11px">mi</span></div>
+        <div class="hud-item"><span id="speed" class="big">11<span class="unit">MPH</span></span></div>
+        <div class="hud-item"><span class="gear" id="gear">D</span></div>
+      </div>
+      <div class="hud-item"><span id="clock">4:09 pm</span><span class="dot warn"></span><span id="temp">68°F</span></div>
+    </div>
+
+    <div id="navpanel">
+      <div class="nav-row">
+        <div class="nav-turn right">↑</div>
+        <div>
+          <div class="nav-street">Shelter Island Dr</div>
+          <div class="nav-dist">0.1 mi · 右转</div>
+        </div>
+        <div class="speed-limit">30</div>
+      </div>
+    </div>
+
+    <div id="midmode">Driving Home</div>
+
+    <div id="tripcard">
+      <div class="trip-head"><span class="trip-time">4:16 pm</span><span class="trip-dest">Home</span></div>
+      <div class="trip-line"><span id="tripminutes">7 min</span><span class="val" id="tripdist">1.3 mi</span></div>
+      <div class="trip-btn" id="endtrip">End Trip</div>
+      <div class="battery"><div class="battery-fill" id="batfill"></div></div>
+      <div id="batlabel"><span>电池</span><span id="batpct">68%</span></div>
+    </div>
+
+    <div id="mediabar">
+      <div class="media-art"></div>
+      <div class="media-info">
+        <div class="media-title">Eshghe Man</div>
+        <div class="media-artist">Moin</div>
+      </div>
+      <div class="media-controls">
+        <div class="media-btn">⏮</div>
+        <div class="media-btn play">▶</div>
+        <div class="media-btn">⏭</div>
+        <div class="media-btn">⟲</div>
+        <div class="media-btn">🔍</div>
+      </div>
+    </div>
+
+    <div id="bottomrow">
+      <div class="bottom-item"><div class="icon">🚗</div><div class="label">Car</div></div>
+      <div class="bottom-item"><div class="icon">🌡</div><div class="temp">75°</div></div>
+      <div class="sep"></div>
+      <div class="bottom-item"><div class="icon">🪑</div><div class="label">Seat</div></div>
+      <div class="bottom-item"><div class="icon">📞</div><div class="label">Phone</div></div>
+      <div class="bottom-item"><div class="icon">🟢</div><div class="label">Music</div></div>
+      <div class="bottom-item"><div class="icon">🎵</div><div class="label">Media</div></div>
+      <div class="sep"></div>
+      <div class="bottom-item"><div class="icon">📱</div><div class="label">Apps</div></div>
+      <div class="bottom-item"><div class="icon">🔊</div><div class="label">Vol</div></div>
+    </div>
+  </div>
+
+  <div id="toolbar">
+    <button id="btn-topdown">车顶俯视 <span class="kbd">T</span></button>
+    <button id="btn-pause">暂停 <span class="kbd">空格</span></button>
+  </div>
+
+  <div id="info">正在生成 3D 环境…</div>
+
+  <script type="module">
+    /* ============================================================
+       世界坐标约定（务必保持）
+       - 道路沿 X 轴延伸，自车朝 +X 行驶
+       - 自车右侧（海的一侧）是 +Z
+       - 对向车道在 -Z
+       车辆模型的"车头"一律建在 +X 侧，长轴沿 X —— 不再靠旋转纠偏
+       ============================================================ */
+
+    const ROAD_HALF = 8;          // 可行驶区半宽（z: -8..8）
+    const LANE_W = 4;
+    const CONVEYOR_SPAN = 252;    // 循环区间 [−126, 126]，能被各种间距整除
+
+    /* ---------- 程序化贴图 ---------- */
+    function makeSkyTexture(THREE) {
+      const c = document.createElement('canvas');
+      c.width = 32; c.height = 1024;
+      const ctx = c.getContext('2d');
+      const g = ctx.createLinearGradient(0, 0, 0, 1024);
+      g.addColorStop(0.00, '#1d3557');
+      g.addColorStop(0.22, '#3f6a91');
+      g.addColorStop(0.42, '#7fa6c0');
+      g.addColorStop(0.55, '#c9cbb0');
+      g.addColorStop(0.62, '#f0c98a');
+      g.addColorStop(0.66, '#e8b56e');
+      g.addColorStop(0.70, '#9fb4c2');
+      g.addColorStop(1.00, '#8a9ea8');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, 32, 1024);
+      const t = new THREE.CanvasTexture(c);
+      t.colorSpace = THREE.SRGBColorSpace;
+      return t;
+    }
+
+    function makeAsphaltTexture(THREE) {
+      const s = 512;
+      const c = document.createElement('canvas');
+      c.width = c.height = s;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#3a3d42'; ctx.fillRect(0, 0, s, s);
+      const img = ctx.getImageData(0, 0, s, s);
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const n = (Math.random() - 0.5) * 26;
+        d[i] = Math.max(0, Math.min(255, d[i] + n));
+        d[i + 1] = Math.max(0, Math.min(255, d[i + 1] + n));
+        d[i + 2] = Math.max(0, Math.min(255, d[i + 2] + n));
+      }
+      ctx.putImageData(img, 0, 0);
+      ctx.strokeStyle = 'rgba(20,20,22,0.12)';
+      for (let i = 0; i < 24; i++) {
+        ctx.lineWidth = 6 + Math.random() * 18;
+        ctx.beginPath();
+        ctx.moveTo(Math.random() * s, 0);
+        ctx.bezierCurveTo(Math.random() * s, s * 0.4, Math.random() * s, s * 0.7, Math.random() * s, s);
+        ctx.stroke();
+      }
+      const t = new THREE.CanvasTexture(c);
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.repeat.set(24, 4);
+      t.anisotropy = 8;
+      return t;
+    }
+
+    function makeWaterTexture(THREE) {
+      const s = 512;
+      const c = document.createElement('canvas');
+      c.width = c.height = s;
+      const ctx = c.getContext('2d');
+      const g = ctx.createLinearGradient(0, 0, 0, s);
+      g.addColorStop(0, '#5f93b5');
+      g.addColorStop(0.45, '#7ba9c4');
+      g.addColorStop(1, '#93b9ce');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, s, s);
+      ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+      for (let i = 0; i < 220; i++) {
+        ctx.lineWidth = 0.6 + Math.random() * 1.6;
+        const y = Math.random() * s;
+        const x = Math.random() * s;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + 12 + Math.random() * 40, y + (Math.random() - 0.5) * 2);
+        ctx.stroke();
+      }
+      const t = new THREE.CanvasTexture(c);
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.repeat.set(16, 6);
+      return t;
+    }
+
+    function makeConcreteTexture(THREE) {
+      const s = 256;
+      const c = document.createElement('canvas');
+      c.width = c.height = s;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#9a9c9e'; ctx.fillRect(0, 0, s, s);
+      for (let i = 0; i < 1500; i++) {
+        ctx.fillStyle = `rgba(${Math.random() > 0.5 ? 255 : 0},${Math.random() > 0.5 ? 255 : 0},${Math.random() > 0.5 ? 255 : 0},0.04)`;
+        ctx.fillRect(Math.random() * s, Math.random() * s, 2, 2);
+      }
+      const t = new THREE.CanvasTexture(c);
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.repeat.set(40, 8);
+      return t;
+    }
+
+    /* ---------- 车辆（长轴沿 X，车头朝 +X） ---------- */
+    const SPECS = {
+      sedan:   { len: 4.60, wid: 1.88, bodyH: 0.72, cabinLen: 2.10, cabinH: 0.60, cabinX: -0.20 },
+      suv:     { len: 4.85, wid: 1.98, bodyH: 0.92, cabinLen: 2.55, cabinH: 0.70, cabinX: -0.30 },
+      pickup:  { len: 5.35, wid: 2.05, bodyH: 0.82, cabinLen: 1.95, cabinH: 0.74, cabinX:  0.95 },
+      van:     { len: 5.45, wid: 2.12, bodyH: 1.55, cabinLen: 1.60, cabinH: 0.85, cabinX:  1.85 },
+      trailer: { len: 6.80, wid: 2.05, bodyH: 0.70, cabinLen: 1.95, cabinH: 0.74, cabinX:  2.20 },
+    };
+
+    function createVehicle(THREE, type, colorHex, opts = {}) {
+      const spec = SPECS[type] || SPECS.sedan;
+      const g = new THREE.Group();
+      const wheelR = type === 'van' ? 0.40 : 0.35;
+
+      // 更真实的材质
+      const paint = new THREE.MeshPhysicalMaterial({
+        color: colorHex,
+        roughness: 0.32,
+        metalness: 0.55,
+        clearcoat: 0.85,
+        clearcoatRoughness: 0.18,
+        envMapIntensity: 1.0,
+      });
+      const glass = new THREE.MeshPhysicalMaterial({
+        color: 0x0d1b26,
+        roughness: 0.08,
+        metalness: 0.6,
+        transmission: 0.35,
+        transparent: true,
+        opacity: 0.9,
+        envMapIntensity: 1.2,
+      });
+      const rubber = new THREE.MeshStandardMaterial({ color: 0x14161a, roughness: 0.95, metalness: 0.05 });
+      const chrome = new THREE.MeshStandardMaterial({ color: 0xc9d2da, roughness: 0.22, metalness: 0.95 });
+      const dark = new THREE.MeshStandardMaterial({ color: 0x1b1e23, roughness: 0.7, metalness: 0.2 });
+
+      const baseY = wheelR;
+
+      // 主车身（使用更真实的材质）
+      const body = new THREE.Mesh(new THREE.BoxGeometry(spec.len, spec.bodyH, spec.wid), paint);
+      body.position.y = baseY + spec.bodyH / 2;
+      g.add(body);
+
+      // 车顶（驾驶舱）
+      const cabin = new THREE.Mesh(
+        new THREE.BoxGeometry(spec.cabinLen, spec.cabinH, spec.wid * 0.9),
+        type === 'van' || type === 'trailer' ? paint : glass
+      );
+      cabin.position.set(spec.cabinX, baseY + spec.bodyH + spec.cabinH / 2 - 0.02, 0);
+      g.add(cabin);
+
+      // 皮卡：后斗（低矮货箱 + 蓝色盖板）
+      if (type === 'pickup') {
+        const bedLen = spec.len - spec.cabinLen - 0.55;
+        const bedX = spec.cabinX - spec.cabinLen / 2 - bedLen / 2;
+        const bed = new THREE.Mesh(new THREE.BoxGeometry(bedLen, 0.42, spec.wid * 0.95), paint);
+        bed.position.set(bedX, baseY + spec.bodyH + 0.16, 0);
+        g.add(bed);
+        const coverMat = new THREE.MeshPhysicalMaterial({ color: opts.coverColor ?? 0x2b6cb0, roughness: 0.35, metalness: 0.4, clearcoat: 0.6 });
+        const cover = new THREE.Mesh(new THREE.BoxGeometry(bedLen * 0.94, 0.06, spec.wid * 0.86), coverMat);
+        cover.position.set(bedX, baseY + spec.bodyH + 0.4, 0);
+        g.add(cover);
+      }
+
+      // 拖车：后部平板与挡板
+      if (type === 'trailer') {
+        const bedLen = spec.len - spec.cabinLen - 0.9;
+        const bedX = spec.cabinX - spec.cabinLen / 2 - bedLen / 2;
+        const bed = new THREE.Mesh(new THREE.BoxGeometry(bedLen, 0.16, spec.wid * 1.02), dark);
+        bed.position.set(bedX, baseY + spec.bodyH + 0.1, 0);
+        g.add(bed);
+        for (const zz of [-1, 1]) {
+          const rail = new THREE.Mesh(new THREE.BoxGeometry(bedLen, 0.06, 0.1), chrome);
+          rail.position.set(bedX, baseY + spec.bodyH + 0.42, zz * spec.wid * 0.5);
+          g.add(rail);
+        }
+      }
+
+      // 车轮（轴向 Z）
+      const wheels = [];
+      const wGeo = new THREE.CylinderGeometry(wheelR, wheelR, 0.26, 20);
+      wGeo.rotateX(Math.PI / 2);
+      const hubGeo = new THREE.CylinderGeometry(wheelR * 0.52, wheelR * 0.52, 0.28, 14);
+      hubGeo.rotateX(Math.PI / 2);
+      const axleXs = type === 'trailer' ? [1.8, -1.4, -2.6] : [spec.len / 2 - 1.15, -(spec.len / 2 - 1.15)];
+      for (const ax of axleXs) {
+        for (const side of [-1, 1]) {
+          const z = side * (spec.wid / 2 - 0.02);
+          const w = new THREE.Mesh(wGeo, rubber);
+          w.position.set(ax, wheelR, z);
+          g.add(w);
+          const hub = new THREE.Mesh(hubGeo, chrome);
+          hub.position.set(0, 0, 0);
+          w.add(hub);
+          wheels.push(w);
+        }
+      }
+
+      // 头灯 / 尾灯
+      const headMat = new THREE.MeshStandardMaterial({ color: 0xfff4d6, emissive: 0xfff0c0, emissiveIntensity: 1.4, roughness: 0.3 });
+      const tailMat = new THREE.MeshStandardMaterial({ color: 0xff2b2b, emissive: 0xff1a1a, emissiveIntensity: 1.0, roughness: 0.4 });
+      const frontX = spec.len / 2;
+      const rearX = -spec.len / 2;
+      for (const side of [-1, 1]) {
+        const hl = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.16, 0.42), headMat);
+        hl.position.set(frontX + 0.01, baseY + spec.bodyH * 0.72, side * spec.wid * 0.31);
+        g.add(hl);
+        const tl = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.18, 0.34), tailMat);
+        tl.position.set(rearX - 0.01, baseY + spec.bodyH * 0.75, side * spec.wid * 0.33);
+        g.add(tl);
+      }
+
+      // 前保险杠 + 格栅
+      const bumper = new THREE.Mesh(new THREE.BoxGeometry(0.22, spec.bodyH * 0.5, spec.wid * 0.98), dark);
+      bumper.position.set(frontX - 0.02, baseY + spec.bodyH * 0.28, 0);
+      g.add(bumper);
+      const grille = new THREE.Mesh(new THREE.BoxGeometry(0.05, spec.bodyH * 0.26, spec.wid * 0.6), chrome);
+      grille.position.set(frontX + 0.06, baseY + spec.bodyH * 0.62, 0);
+      g.add(grille);
+
+      // 后视镜
+      for (const side of [-1, 1]) {
+        const mir = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.1, 0.14), dark);
+        mir.position.set(spec.cabinX + spec.cabinLen / 2 - 0.15, baseY + spec.bodyH + spec.cabinH * 0.35, side * (spec.wid / 2 + 0.09));
+        g.add(mir);
+      }
+
+      g.userData.wheels = wheels;
+      g.userData.wheelR = wheelR;
+      g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+      return g;
+    }
+
+    /* ============================================================ */
+    async function start() {
+      const [THREE, { RoomEnvironment }] = await Promise.all([
+        import('three'),
+        import('three/addons/environments/RoomEnvironment.js'),
+      ]);
+
+      const scene = new THREE.Scene();
+      const canvas = document.querySelector('#main');
+      const camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.1, 900);
+
+      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.0;
+
+      // 环境光照（IBL，让车漆有反射而不是死黑）
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      const envRT = pmrem.fromScene(new RoomEnvironment(), 0.06);
+      scene.environment = envRT.texture;
+      scene.environmentIntensity = 0.55;
+      pmrem.dispose();
+
+      scene.fog = new THREE.FogExp2(0xa9c1cf, 0.0075);
+
+      /* ---------- 天空 ---------- */
+      const sky = new THREE.Mesh(
+        new THREE.SphereGeometry(500, 40, 24),
+        new THREE.MeshBasicMaterial({ map: makeSkyTexture(THREE), side: THREE.BackSide, fog: false, depthWrite: false })
+      );
+      scene.add(sky);
+
+      // 太阳
+      const sunDir = new THREE.Vector3(0.55, 0.16, 0.82).normalize();
+      const sunSprite = new THREE.Mesh(
+        new THREE.CircleGeometry(26, 32),
+        new THREE.MeshBasicMaterial({ color: 0xfff0c8, transparent: true, opacity: 0.85, fog: false, depthWrite: false })
+      );
+      sunSprite.position.copy(sunDir.clone().multiplyScalar(430));
+      sunSprite.lookAt(0, 0, 0);
+      scene.add(sunSprite);
+
+      /* ---------- 光照 ---------- */
+      const hemi = new THREE.HemisphereLight(0xcfe4f5, 0x40474e, 0.55);
+      scene.add(hemi);
+
+      const sun = new THREE.DirectionalLight(0xffe0b0, 3.0);
+      sun.position.copy(sunDir.clone().multiplyScalar(90));
+      sun.castShadow = true;
+      sun.shadow.mapSize.set(2048, 2048);
+      const sc = sun.shadow.camera;
+      sc.left = -34; sc.right = 34; sc.top = 34; sc.bottom = -34;
+      sc.near = 1; sc.far = 220;
+      sun.shadow.bias = -0.0004;
+      sun.shadow.normalBias = 0.035;
+      sun.shadow.radius = 3;
+      scene.add(sun);
+      scene.add(sun.target);
+
+      const fill = new THREE.DirectionalLight(0x8fb4d8, 0.8);
+      fill.position.set(-40, 20, -50);
+      scene.add(fill);
+
+      /* ---------- 地面 / 路面 ---------- */
+      const asphalt = makeAsphaltTexture(THREE);
+      const road = new THREE.Mesh(
+        new THREE.PlaneGeometry(520, ROAD_HALF * 2 + 2),
+        new THREE.MeshStandardMaterial({ map: asphalt, roughness: 0.93, metalness: 0.02 })
+      );
+      road.rotation.x = -Math.PI / 2;
+      road.receiveShadow = true;
+      scene.add(road);
+
+      // 路外地面（土/草地）
+      const dirtMat = new THREE.MeshStandardMaterial({ color: 0x6f6a52, roughness: 1.0 });
+      for (const side of [-1, 1]) {
+        const strip = new THREE.Mesh(new THREE.PlaneGeometry(520, 120), dirtMat);
+        strip.rotation.x = -Math.PI / 2;
+        strip.position.set(0, -0.02, side * (ROAD_HALF + 1 + 60));
+        strip.receiveShadow = true;
+        scene.add(strip);
+      }
+
+      /* ---------- 车道标线 ---------- */
+      const whiteMat = new THREE.MeshStandardMaterial({ color: 0xe8e8e4, roughness: 0.65, metalness: 0.0 });
+      const yellowMat = new THREE.MeshStandardMaterial({ color: 0xd8b23c, roughness: 0.7 });
+
+      function solidLine(z, mat, width = 0.14) {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(CONVEYOR_SPAN, 0.02, width), mat);
+        m.position.set(0, 0.012, z);
+        m.receiveShadow = true;
+        scene.add(m);
+      }
+      solidLine(ROAD_HALF - 0.25, whiteMat);     // 右外侧白实线
+      solidLine(-(ROAD_HALF - 0.25), whiteMat);  // 左外侧白实线
+      solidLine(0.16, yellowMat);                // 中央双黄线
+      solidLine(-0.16, yellowMat);
+
+      // 移动的虚线（跟随自车滚动，制造前进感）
+      const dashMeshes = [];
+      const dashGeo = new THREE.BoxGeometry(3.0, 0.02, 0.14);
+      const DASH_GAP = 9;
+      for (const z of [4, -4]) {
+        for (let x = -126; x < 126; x += DASH_GAP) {
+          const d = new THREE.Mesh(dashGeo, whiteMat);
+          d.position.set(x, 0.014, z);
+          d.receiveShadow = true;
+          scene.add(d);
+          dashMeshes.push(d);
+        }
+      }
+
+      /* ---------- 路缘石 / 人行道 ---------- */
+      const concrete = makeConcreteTexture(THREE);
+      for (const side of [-1, 1]) {
+        const curb = new THREE.Mesh(
+          new THREE.BoxGeometry(CONVEYOR_SPAN, 0.3, 0.55),
+          new THREE.MeshStandardMaterial({ map: concrete, roughness: 0.9 })
+        );
+        curb.position.set(0, 0.15, side * (ROAD_HALF + 0.3));
+        curb.receiveShadow = true;
+        curb.castShadow = true;
+        scene.add(curb);
+
+        const walk = new THREE.Mesh(
+          new THREE.PlaneGeometry(CONVEYOR_SPAN, 3.4),
+          new THREE.MeshStandardMaterial({ color: 0xa8a49a, roughness: 0.95 })
+        );
+        walk.rotation.x = -Math.PI / 2;
+        walk.position.set(0, 0.02, side * (ROAD_HALF + 0.6 + 1.7));
+        walk.receiveShadow = true;
+        scene.add(walk);
+      }
+
+      /* ---------- 海面（右侧 +Z） ---------- */
+      const water = new THREE.Mesh(
+        new THREE.PlaneGeometry(620, 160, 1, 1),
+        new THREE.MeshStandardMaterial({
+          map: makeWaterTexture(THREE),
+          roughness: 0.18, metalness: 0.45, envMapIntensity: 1.0,
+          color: 0x9fc4d8,
+        })
+      );
+      water.rotation.x = -Math.PI / 2;
+      water.position.set(0, -0.35, ROAD_HALF + 90);
+      water.receiveShadow = true;
+      scene.add(water);
+
+      // 岸边的抛石护坡
+      const rockMat = new THREE.MeshStandardMaterial({ color: 0x8b8478, roughness: 0.95, flatShading: true });
+      for (let x = -126; x < 126; x += 2.2) {
+        const r = new THREE.Mesh(new THREE.DodecahedronGeometry(0.55 + Math.random() * 0.35, 0), rockMat);
+        r.position.set(x, 0.05, ROAD_HALF + 4.2 + Math.random() * 1.8);
+        r.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
+        r.castShadow = true; r.receiveShadow = true;
+        scene.add(r);
+      }
+
+      /* ---------- 棕榈树（滚动） ---------- */
+      const palmTrunkMat = new THREE.MeshStandardMaterial({ color: 0x6b5a45, roughness: 0.95 });
+      const palmLeafMat = new THREE.MeshStandardMaterial({ color: 0x35592f, roughness: 0.9, side: THREE.DoubleSide });
+      function makePalm() {
+        const p = new THREE.Group();
+        const h = 6 + Math.random() * 2;
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.26, h, 8), palmTrunkMat);
+        trunk.position.y = h / 2;
+        trunk.castShadow = true;
+        p.add(trunk);
+        const nLeaves = 8;
+        for (let i = 0; i < nLeaves; i++) {
+          const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.5, 3.2, 4), palmLeafMat);
+          const a = (i / nLeaves) * Math.PI * 2;
+          leaf.position.set(Math.cos(a) * 1.0, h + 0.2, Math.sin(a) * 1.0);
+          leaf.rotation.z = Math.cos(a) * 1.15;
+          leaf.rotation.x = -Math.sin(a) * 1.15;
+          leaf.castShadow = true;
+          p.add(leaf);
+        }
+        return p;
+      }
+      const palms = [];
+      for (let x = -126; x < 126; x += 21) {
+        for (const side of [-1, 1]) {
+          const p = makePalm();
+          p.position.set(x + Math.random() * 6, 0, side * (ROAD_HALF + 4.5 + Math.random() * 2));
+          p.rotation.y = Math.random() * Math.PI;
+          scene.add(p);
+          palms.push(p);
+        }
+      }
+
+      /* ---------- 海面上的帆船（滚动） ---------- */
+      const boats = [];
+      function makeBoat() {
+        const b = new THREE.Group();
+        const hull = new THREE.Mesh(new THREE.CapsuleGeometry(0.28, 1.5, 4, 8), new THREE.MeshStandardMaterial({ color: 0xf2f4f6, roughness: 0.5 }));
+        hull.rotation.z = Math.PI / 2;
+        hull.position.y = 0.15;
+        b.add(hull);
+        const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 3.4, 6), new THREE.MeshStandardMaterial({ color: 0xb0b6bc }));
+        mast.position.y = 1.8;
+        b.add(mast);
+        const sail = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 2.6), new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.8, side: THREE.DoubleSide }));
+        sail.position.set(0.5, 2.0, 0);
+        b.add(sail);
+        return b;
+      }
+      for (let i = 0; i < 9; i++) {
+        const b = makeBoat();
+        const x = -200 + i * 50 + Math.random() * 20;
+        b.position.set(x, -0.1, ROAD_HALF + 22 + Math.random() * 55);
+        b.rotation.y = Math.random() * Math.PI * 2;
+        scene.add(b);
+        boats.push(b);
+      }
+
+      /* ---------- 自车 ---------- */
+      const ego = createVehicle(THREE, 'pickup', 0x9fb2c8, { coverColor: 0x2f7fd0 });
+      ego.position.set(0, 0, 2);
+      scene.add(ego);
+
+      /* ---------- 交通流（相对自车的运动） ----------
+         relSpeed = 车辆自身速度×方向 − 自车速度；自车恒定向 +X */
+      const traffic = [];
+      const trafficDefs = [
+        { x:  26, z:  2, type: 'van',    color: 0xf4f4f4, spd: 5.2, dir:  1 },
+        { x:  58, z:  6, type: 'sedan',  color: 0xe8e8e8, spd: 6.6, dir:  1 },
+        { x: -22, z:  6, type: 'pickup', color: 0x1c2634, spd: 5.6, dir:  1 },
+        { x: -62, z:  2, type: 'suv',    color: 0x33383e, spd: 5.4, dir:  1 },
+        { x:  18, z: -2, type: 'pickup', color: 0x14161a, spd: 6.0, dir: -1 },
+        { x:  74, z: -2, type: 'sedan',  color: 0x2e5a88, spd: 6.4, dir: -1 },
+        { x: -34, z: -6, type: 'trailer',color: 0xdfe3e6, spd: 5.2, dir: -1 },
+        { x:  96, z: -6, type: 'van',    color: 0xe9edf0, spd: 5.8, dir: -1 },
+        { x: -96, z: -6, type: 'sedan',  color: 0x6b7280, spd: 6.1, dir: -1 },
+      ];
+      for (const d of trafficDefs) {
+        const v = createVehicle(THREE, d.type, d.color);
+        v.position.set(d.x, 0, d.z);
+        v.rotation.y = d.dir === 1 ? 0 : Math.PI;
+        scene.add(v);
+        traffic.push({ mesh: v, x: d.x, z: d.z, spd: d.spd, cur: d.spd, dir: d.dir });
+      }
+
+      /* ---------- 相机（可拖拽环绕，360° 看车） ---------- */
+      let topdown = false;
+      let paused = false;
+
+      const CHASE_AZ = Math.PI;
+      const CHASE_EL = 0.30;
+      const CHASE_DIST = 9.6;
+      const orbit = {
+        az: CHASE_AZ,
+        el: CHASE_EL,
+        dist: CHASE_DIST,
+        target: new THREE.Vector3(0, 1.05, 2),
+      };
+      const camLookAt = orbit.target.clone();
+
+      function orbitPosition(out) {
+        const r = orbit.dist * Math.cos(orbit.el);
+        return out.set(
+          orbit.target.x + r * Math.cos(orbit.az),
+          orbit.target.y + orbit.dist * Math.sin(orbit.el),
+          orbit.target.z + r * Math.sin(orbit.az)
+        );
+      }
+
+      // 初始落位
+      orbitPosition(camera.position);
+      camera.lookAt(orbit.target);
+
+      // 拖拽 / 滚轮
+      const drag = { active: false, x: 0, y: 0, id: null };
+      const canvasEl = renderer.domElement;
+      canvasEl.style.cursor = 'grab';
+      canvasEl.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0 && e.pointerType === 'mouse') return;
+        drag.active = true;
+        drag.x = e.clientX;
+        drag.y = e.clientY;
+        drag.id = e.pointerId;
+        canvasEl.style.cursor = 'grabbing';
+        canvasEl.setPointerCapture?.(e.pointerId);
+      });
+      canvasEl.addEventListener('pointermove', (e) => {
+        if (!drag.active) return;
+        const dx = e.clientX - drag.x;
+        const dy = e.clientY - drag.y;
+        drag.x = e.clientX;
+        drag.y = e.clientY;
+        orbit.az -= dx * 0.006;
+        orbit.el = Math.min(1.40, Math.max(0.02, orbit.el + dy * 0.005));
+      });
+      function endDrag(e) {
+        if (!drag.active) return;
+        drag.active = false;
+        canvasEl.style.cursor = 'grab';
+        if (e && drag.id != null) canvasEl.releasePointerCapture?.(drag.id);
+      }
+      canvasEl.addEventListener('pointerup', endDrag);
+      canvasEl.addEventListener('pointercancel', endDrag);
+      canvasEl.addEventListener('pointerleave', (e) => { if (drag.active && !canvasEl.hasPointerCapture?.(drag.id)) endDrag(e); });
+      canvasEl.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        orbit.dist = Math.min(32, Math.max(3.6, orbit.dist * (1 + Math.sign(e.deltaY) * 0.08)));
+      }, { passive: false });
+
+      // 双击复位到车后跟随视角
+      canvasEl.addEventListener('dblclick', () => resetCamera());
+
+      function resetCamera() {
+        orbit.az = CHASE_AZ;
+        orbit.el = CHASE_EL;
+        orbit.dist = CHASE_DIST;
+        orbit.target.set(0, 1.05, 2);
+        camLookAt.copy(orbit.target);
+      }
+
+      function updateCamera(dt) {
+        // 相机目标平滑跟随自车
+        const want = new THREE.Vector3(ego.position.x, ego.position.y + 1.05, ego.position.z);
+        orbit.target.lerp(want, 1 - Math.pow(0.0025, dt));
+
+        if (topdown) {
+          const desired = new THREE.Vector3(orbit.target.x - 0.01, orbit.target.y + 30, orbit.target.z + 0.01);
+          camera.position.lerp(desired, 0.12);
+          camLookAt.lerp(orbit.target, 0.2);
+          camera.lookAt(camLookAt);
+          return;
+        }
+
+        const desired = orbitPosition(new THREE.Vector3());
+        camera.position.lerp(desired, 1 - Math.pow(0.00001, dt));
+        camLookAt.lerp(orbit.target, 1 - Math.pow(0.0008, dt));
+        camera.lookAt(camLookAt);
+      }
+
+      /* ---------- HUD ---------- */
+      const clockEl = document.querySelector('#clock');
+      const speedEl = document.querySelector('#speed');
+      const rangeEl = document.querySelector('#range');
+      const batFillEl = document.querySelector('#batfill');
+      const batPctEl = document.querySelector('#batpct');
+      const tripDistEl = document.querySelector('#tripdist');
+      const tripTimeEl = document.querySelector('.trip-time');
+      const tripMinutesEl = document.querySelector('#tripminutes');
+      const temperatureF = 68;
+      for (const tempEl of document.querySelectorAll('#temp, .bottom-item .temp')) {
+        tempEl.textContent = temperatureF + '°F';
+      }
+      const timeFormat = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+      const initialTripMinutes = 7;
+      const initialTripDist = 1.3;
+      let battery = 68;
+      let tripDist = initialTripDist;
+      function updateHUD(dt) {
+        const now = Date.now();
+        clockEl.textContent = timeFormat.format(now).toLowerCase();
+        const mph = paused ? 0 : Math.round(egoSpeed * 2.23694);
+        speedEl.innerHTML = mph + '<span class="unit">MPH</span>';
+        rangeEl.textContent = Math.max(0, Math.round(212 - (100 - battery) * 2.4));
+        if (!paused) {
+          battery = Math.max(0, battery - dt * 0.004);
+          tripDist = Math.max(0, tripDist - dt * egoSpeed * 0.000621371 * 0.12);
+        }
+        batFillEl.style.width = battery.toFixed(1) + '%';
+        batPctEl.textContent = Math.round(battery) + '%';
+        tripDistEl.textContent = tripDist.toFixed(1) + ' mi';
+        // 按剩余里程估算分钟数，行程耗时和到达时间使用同一个值。
+        const remainingMinutes = Math.ceil(initialTripMinutes * (tripDist / initialTripDist));
+        tripMinutesEl.textContent = remainingMinutes + ' min';
+        tripTimeEl.textContent = timeFormat.format(now + remainingMinutes * 60_000).toLowerCase();
+      }
+
+      /* ---------- 世界循环（自车不动，世界后退） ---------- */
+      // 自车基础速度与实际速度（会因前车而变化）
+      const EGO_BASE_SPEED = 4.9;    // m/s ≈ 11 mph
+      let egoSpeed = EGO_BASE_SPEED;
+      const MIN_GAP = 6;             // 与前车最小间距（米）
+      const SAFE_GAP = 12;           // 交通车之间开始减速的间距（米，需大于车长）
+
+      function scrollWorld(dt) {
+        // 计算自车当前车道上最近的前车（同向、同车道、在前方）
+        let frontCar = null;
+        let frontDist = Infinity;
+        for (const t of traffic) {
+          if (t.dir !== 1) continue;                    // 只看同向车
+          if (Math.abs(t.z - ego.position.z) > 2.5) continue; // 只看同车道（车宽≈2m，lane≈4m）
+          const dist = t.x - ego.position.x;
+          if (dist > 0 && dist < frontDist) {           // 在前方
+            frontDist = dist;
+            frontCar = t;
+          }
+        }
+
+        // 交通车之间的跟车：同车道同方向，前车太近就减速，避免互相穿透
+        // （相对间距不受自车运动影响；自车也作为 z=2、dir=1 车道的障碍）
+        const egoObstacle = { x: ego.position.x, z: ego.position.z, dir: 1, cur: egoSpeed, isEgo: true };
+        for (const t of traffic) {
+          let gap = Infinity, leader = null;
+          for (const o of [...traffic, egoObstacle]) {
+            if (o === t || o.dir !== t.dir || Math.abs(o.z - t.z) > 0.5) continue;
+            let g = t.dir === 1 ? o.x - t.x : t.x - o.x;
+            g = ((g % CONVEYOR_SPAN) + CONVEYOR_SPAN) % CONVEYOR_SPAN;
+            if (g > 0 && g < gap) { gap = g; leader = o; }
+          }
+          if (leader && gap < SAFE_GAP) {
+            t.cur += (Math.min(t.cur, leader.cur * 0.98) - t.cur) * 0.08;
+          } else {
+            t.cur += (t.spd - t.cur) * 0.02;
+          }
+        }
+
+        // 简单的跟车逻辑：如果前车太近且比自车慢，自车减速跟随
+        if (frontCar && frontDist < MIN_GAP + frontCar.mesh.userData.wheelR * 2) {
+          const targetSpeed = Math.min(egoSpeed, frontCar.cur * 0.98);
+          egoSpeed += (targetSpeed - egoSpeed) * 0.05;  // 平滑过渡
+        } else {
+          // 恢复基础速度
+          egoSpeed += (EGO_BASE_SPEED - egoSpeed) * 0.02;
+        }
+
+        const dx = egoSpeed * dt;  // 使用实际自车速度
+
+        // 移动虚线
+        for (const d of dashMeshes) {
+          d.position.x -= dx;
+          if (d.position.x < -126) d.position.x += CONVEYOR_SPAN;
+        }
+        // 移动棕榈树
+        for (const p of palms) {
+          p.position.x -= dx;
+          if (p.position.x < -126) p.position.x += CONVEYOR_SPAN;
+        }
+        // 移动帆船
+        for (const b of boats) {
+          b.position.x -= dx * 0.65;
+          if (b.position.x < -250) b.position.x += 500;
+          b.position.y = -0.1 + Math.sin(performance.now() * 0.0009 + b.position.x * 0.05) * 0.06;
+        }
+
+        // 移动交通流（使用实际自车速度 egoSpeed 计算相对速度）
+        for (const t of traffic) {
+          const rel = t.dir * t.cur - egoSpeed;
+          t.x += rel * dt;
+          if (t.x > 126) t.x -= CONVEYOR_SPAN;
+          if (t.x < -126) t.x += CONVEYOR_SPAN;
+          t.mesh.position.x = t.x;
+          // 车头始终朝本地 +X（对向车已整体旋转 π），所以车轮转向与方向无关
+          const spin = (t.cur / t.mesh.userData.wheelR) * dt;
+          for (const w of t.mesh.userData.wheels) w.rotation.z -= spin;
+        }
+
+        // 旋转自车的车轮（使用实际自车速度）
+        if (ego.userData.wheels) {
+          const spin = (egoSpeed / ego.userData.wheelR) * dt * 1; // dir = 1 (forward)
+          for (const w of ego.userData.wheels) w.rotation.z -= spin;
+        }
+      }
+
+      /* ---------- 主循环 ---------- */
+      const clock = new THREE.Clock();
+      function animate() {
+        const dt = Math.min(clock.getDelta(), 0.05);
+        if (!paused) scrollWorld(dt);
+        updateCamera(dt);
+        updateHUD(dt);
+        renderer.render(scene, camera);
+        requestAnimationFrame(animate);
+      }
+
+      /* ---------- 交互 ---------- */
+      const btnTopdown = document.querySelector('#btn-topdown');
+      const btnPause = document.querySelector('#btn-pause');
+      btnTopdown.addEventListener('click', () => {
+        topdown = !topdown;
+        btnTopdown.classList.toggle('active', topdown);
+      });
+      btnPause.addEventListener('click', () => {
+        paused = !paused;
+        btnPause.classList.toggle('active', paused);
+        btnPause.innerHTML = (paused ? '继续' : '暂停') + ' <span class="kbd">空格</span>';
+      });
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 't' || e.key === 'T') btnTopdown.click();
+        if (e.code === 'Space') { e.preventDefault(); btnPause.click(); }
+      });
+      document.querySelector('#endtrip').addEventListener('click', () => {
+        document.querySelector('#midmode').textContent = '行程已结束';
+        setTimeout(() => { document.querySelector('#midmode').textContent = 'Driving Home'; }, 2200);
+      });
+
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      document.querySelector('#info').textContent = '拖动旋转视角 · 滚轮缩放';
+      animate();
+    }
+
+    if (location.protocol === 'file:') {
+      document.querySelector('#info').textContent = '请通过本地服务器打开：双击 start.cmd，然后访问 http://127.0.0.1:8123/reality-view.html';
+    } else {
+      start().catch(err => {
+        document.querySelector('#info').textContent = '3D 场景启动失败，请查看控制台。';
+        console.error(err);
+      });
+    }
+  </script>
+</body>
+</html>

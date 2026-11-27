@@ -1,0 +1,10 @@
+# MemSearch 本地状态
+.memsearch/
+
+# 本地备份目录
+._backup-*/
+
+# 系统文件
+Thumbs.db
+desktop.ini
+.DS_Store
